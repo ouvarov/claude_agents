@@ -1,0 +1,18 @@
+# IDE
+.idea/
+
+# MCP config (contains API keys)
+.mcp.json
+
+# Logs
+logs/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json
