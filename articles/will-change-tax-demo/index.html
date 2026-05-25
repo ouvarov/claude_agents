@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>will-change tax — view() parallax demo</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <aside class="controls" aria-label="Live drift controls">
+    <h3>translate amplitude</h3>
+    <label>
+      <span class="swatch a" aria-hidden="true"></span>
+      <input type="range" min="0" max="200" value="30" data-target="a" />
+      <input type="number" min="0" max="500" value="30" data-target="a" />
+    </label>
+    <label>
+      <span class="swatch b" aria-hidden="true"></span>
+      <input type="range" min="0" max="200" value="60" data-target="b" />
+      <input type="number" min="0" max="500" value="60" data-target="b" />
+    </label>
+    <label>
+      <span class="swatch d" aria-hidden="true"></span>
+      <input type="range" min="0" max="200" value="40" data-target="d" />
+      <input type="number" min="0" max="500" value="40" data-target="d" />
+    </label>
+    <label>
+      <span class="swatch e" aria-hidden="true"></span>
+      <input type="range" min="0" max="300" value="80" data-target="e" />
+      <input type="number" min="0" max="500" value="80" data-target="e" />
+    </label>
+    <button class="reset" type="button">reset</button>
+  </aside>
+
+  <header class="hero">
+    <h1>view() parallax demo</h1>
+    <p class="sub">Scroll down. The numbered cards animate via <code>animation-timeline: view()</code> using the modern <code>translate</code> property.</p>
+    <p class="support" id="support">Detecting browser support…</p>
+    <p class="hint">Open DevTools → Performance and Layers panels to inspect.</p>
+  </header>
+
+  <main>
+    <section class="row">
+      <div class="text">
+        <h2>1 — basic view() with translate</h2>
+        <p>
+          The <code>figure</code> on the right drifts from <code>translate: 0 30px</code> to <code>translate: 0 -30px</code> across its scroll-through window. No <code>will-change</code>. No JS. Stop scrolling — it freezes. Scroll back — it reverses.
+        </p>
+      </div>
+      <figure class="parallax parallax-a">
+        <span>A</span>
+      </figure>
+    </section>
+
+    <section class="row">
+      <div class="text">
+        <h2>2 — bigger displacement (speed: 6)</h2>
+        <p>
+          Same recipe, magnitude doubled: <code>60px</code> to <code>-60px</code>. The card moves further across the same viewport pass.
+        </p>
+      </div>
+      <figure class="parallax parallax-b">
+        <span>B</span>
+      </figure>
+    </section>
+
+    <section class="row">
+      <div class="text">
+        <h2>3 — opacity over view()</h2>
+        <p>
+          <code>animation-timeline</code> isn't limited to transforms. Here opacity ramps 0 → 1 → 0 over the scroll-through. Still composited.
+        </p>
+      </div>
+      <figure class="parallax parallax-c">
+        <span>C</span>
+      </figure>
+    </section>
+
+    <section class="row">
+      <div class="text">
+        <h2>4 — combined: translate + scale</h2>
+        <p>
+          Two individual transform properties animating in parallel: <code>translate</code> and <code>scale</code>. Both stay on the compositor fast-path.
+        </p>
+      </div>
+      <figure class="parallax parallax-d">
+        <span>D</span>
+      </figure>
+    </section>
+
+    <section class="row tall">
+      <div class="text">
+        <h2>5 — long block, the same engine</h2>
+        <p>
+          A taller card to confirm the math: full scroll window is <code>viewport height + element height</code>. The animation plays linearly across that window.
+        </p>
+      </div>
+      <figure class="parallax parallax-e">
+        <span>E</span>
+      </figure>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>End of demo. Scroll back up to see the animations reverse.</p>
+  </footer>
+
+  <script>
+    // Capability detection — pure read-only, no animation logic.
+    const el = document.getElementById('support');
+    const hasViewTimeline = CSS.supports('animation-timeline', 'view()');
+    const hasTranslate    = CSS.supports('translate', '0 0');
+    const parts = [
+      `animation-timeline: view() — ${hasViewTimeline ? '✅' : '❌'}`,
+      `translate property — ${hasTranslate ? '✅' : '❌'}`,
+    ];
+    el.textContent = parts.join('  ·  ');
+    el.classList.toggle('ok',  hasViewTimeline && hasTranslate);
+    el.classList.toggle('bad', !(hasViewTimeline && hasTranslate));
+
+    // Live drift controls — write --drift on each parallax card.
+    const defaults = { a: 30, b: 60, d: 40, e: 80 };
+    const targets = {
+      a: document.querySelector('.parallax-a'),
+      b: document.querySelector('.parallax-b'),
+      d: document.querySelector('.parallax-d'),
+      e: document.querySelector('.parallax-e'),
+    };
+
+    function applyDrift(key, value) {
+      const px = Math.max(0, Number(value) || 0);
+      targets[key].style.setProperty('--drift', px + 'px');
+      document.querySelectorAll(`.controls input[data-target="${key}"]`)
+        .forEach(input => { if (input.value !== String(px)) input.value = px; });
+    }
+
+    document.querySelectorAll('.controls input[data-target]').forEach(input => {
+      input.addEventListener('input', e => applyDrift(e.target.dataset.target, e.target.value));
+    });
+
+    document.querySelector('.controls .reset').addEventListener('click', () => {
+      Object.entries(defaults).forEach(([k, v]) => applyDrift(k, v));
+    });
+  </script>
+</body>
+</html>

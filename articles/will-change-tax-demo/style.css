@@ -1,0 +1,242 @@
+:root {
+  --bg: #0e0f12;
+  --fg: #e8e8ea;
+  --muted: #8a8d96;
+  --accent: #7cf;
+  --card-a: #ff7a59;
+  --card-b: #59c8ff;
+  --card-c: #c89bff;
+  --card-d: #6dd58c;
+  --card-e: #ffd166;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: rgba(255,255,255,0.07);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.hero {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 2rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.hero h1   { font-size: 2.5rem; margin: 0 0 0.5rem; }
+.hero .sub { max-width: 36rem; color: var(--muted); margin: 0.25rem 0; }
+.hero .hint { color: var(--muted); font-size: 0.9rem; margin-top: 1.5rem; }
+
+.support {
+  margin: 1rem 0 0;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.support.ok  { background: rgba(125, 213, 140, 0.15); color: #aef0bf; }
+.support.bad { background: rgba(255, 122, 89, 0.15); color: #ffb29c; }
+
+main {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 4rem 2rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+  min-height: 90vh;
+  padding: 6rem 0;
+  border-bottom: 1px dashed rgba(255,255,255,0.08);
+}
+
+.row.tall { min-height: 130vh; }
+
+.text h2 { font-size: 1.5rem; margin: 0 0 0.75rem; }
+.text p  { color: var(--muted); margin: 0; }
+
+.parallax {
+  margin: 0;
+  width: 320px;
+  height: 320px;
+  border-radius: 24px;
+  display: grid;
+  place-items: center;
+  font: 700 6rem/1 system-ui;
+  color: rgba(0,0,0,0.5);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.35);
+  justify-self: center;
+}
+
+.parallax-a { background: var(--card-a); }
+.parallax-b { background: var(--card-b); }
+.parallax-c { background: var(--card-c); }
+.parallax-d { background: var(--card-d); }
+.parallax-e { background: var(--card-e); width: 360px; height: 480px; }
+
+/* ============================================================
+   The actual demo: animation-timeline: view() + translate
+   No will-change anywhere. No JS scroll handlers.
+   --drift is a registered CSS property so keyframes interpolate
+   between var(--drift) and calc(var(--drift) * -1).
+   ============================================================ */
+
+@property --drift {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 30px;
+}
+
+@keyframes drift {
+  from { translate: 0 var(--drift); }
+  to   { translate: 0 calc(var(--drift) * -1); }
+}
+
+@keyframes fade-in-out {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
+}
+
+@keyframes drift-and-scale {
+  from { translate: 0 var(--drift);              scale: 0.85; }
+  to   { translate: 0 calc(var(--drift) * -1);   scale: 1.05; }
+}
+
+.parallax-a { --drift: 30px; animation-name: drift; animation-timing-function: linear; animation-timeline: view(); }
+.parallax-b { --drift: 60px; animation-name: drift; animation-timing-function: linear; animation-timeline: view(); }
+.parallax-c {                animation-name: fade-in-out; animation-timing-function: linear; animation-timeline: view(); }
+.parallax-d { --drift: 40px; animation-name: drift-and-scale; animation-timing-function: linear; animation-timeline: view(); }
+.parallax-e { --drift: 80px; animation-name: drift; animation-timing-function: linear; animation-timeline: view(); }
+
+/* Firefox needs an explicit animation-duration for scroll-driven animations,
+   even though the value is interpreted as a portion of the timeline. */
+@supports (animation-timeline: view()) {
+  .parallax {
+    animation-duration: 1ms;
+  }
+}
+
+.foot {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--muted);
+}
+
+/* ============================================================
+   Control panel — live-edit --drift per card
+   ============================================================ */
+.controls {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+  background: rgba(20, 22, 28, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  min-width: 220px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+.controls h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.controls label {
+  display: grid;
+  grid-template-columns: 1.2rem 1fr 4rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.controls .swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 4px;
+  display: inline-block;
+}
+.controls .swatch.a { background: var(--card-a); }
+.controls .swatch.b { background: var(--card-b); }
+.controls .swatch.d { background: var(--card-d); }
+.controls .swatch.e { background: var(--card-e); }
+
+.controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.controls input[type="number"] {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: var(--fg);
+  padding: 0.2rem 0.35rem;
+  font: inherit;
+  text-align: right;
+}
+
+.controls .reset {
+  margin-top: 0.5rem;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--fg);
+  padding: 0.35rem;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.controls .reset:hover { background: rgba(255, 255, 255, 0.14); }
+
+@media (max-width: 720px) {
+  .controls {
+    top: auto;
+    bottom: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .row { grid-template-columns: 1fr; gap: 2rem; }
+  .parallax { width: 220px; height: 220px; font-size: 4rem; }
+  .parallax-e { width: 240px; height: 320px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parallax {
+    animation: none !important;
+    translate: none !important;
+    scale: 1 !important;
+  }
+}
