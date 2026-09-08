@@ -3,7 +3,7 @@
 Инфра поднята 2026-09-07 (DevOps, DM): `gimli.promova.com` — dev-хост,
 `gimli_dev/kv/env` и `gimli_prod/kv/env` созданы пустыми.
 
-Движок читает 22 переменные. Источник прод-значений — Vault монорепы,
+Движок читает 23 переменные. Источник прод-значений — Vault монорепы,
 mount `monorepo-frontend-prod`, path `student` (это тот деплой, что обслуживает
 `/kilo/general-english` на promova.com; см. `.github/deployment-config.yaml:21`).
 
@@ -20,6 +20,7 @@ mount `monorepo-frontend-prod`, path `student` (это тот деплой, чт
 | `API_HOST` | Vault `student` → `NEXT_PUBLIC_API_HOST` | нет |
 | `API_PAYMENTS_HOST` | Vault `student` → `NEXT_PUBLIC_API_PAYMENTS_HOST` | нет |
 | `API_MARKETING_HOST` | Vault `student` → `NEXT_PUBLIC_API_MARKETING` | нет |
+| `MARKETING_STRAPI_URL` | Vault `student` → `NEXT_PUBLIC_MARKETING_STRAPI_URL` (прод-значение `https://gringotts.promova.work`) | нет |
 | `AMPLITUDE_API_KEY` | Vault `student` → `NEXT_PUBLIC_AMPLITUDE_API_KEY` | нет* |
 | `COOKIEYES_ID` | Vault `student` → `NEXT_PUBLIC_COOKIEYES_ID` | нет |
 | `FB_PIXEL_ID` | Vault `student` → `NEXT_PUBLIC_FB_PIXEL_ID` | нет |
@@ -58,6 +59,7 @@ LOAD_PIXELS=true
 API_HOST=<student: NEXT_PUBLIC_API_HOST>
 API_PAYMENTS_HOST=<student: NEXT_PUBLIC_API_PAYMENTS_HOST>
 API_MARKETING_HOST=<student: NEXT_PUBLIC_API_MARKETING>
+MARKETING_STRAPI_URL=https://gringotts.promova.work
 GROWTHBOOK_API_HOST=<student: NEXT_PUBLIC_GROWTH_BOOK_API_KEY>
 GROWTHBOOK_CLIENT_KEY=<student: NEXT_PUBLIC_GROWTH_SERVERSIDE_CLIENT_KEY>
 AMPLITUDE_API_KEY=<student: NEXT_PUBLIC_AMPLITUDE_API_KEY>
@@ -104,3 +106,15 @@ LOAD_PIXELS=false
 4. `HOSTNAME` из downward API.
 5. Пробы: `GET /healthz` (liveness), `GET /ready` (readiness, 503 до загрузки
    реестра воронок).
+6. **Email Address Obfuscation на зоне `gimli.promova.com`.** На `promova.com`
+   она включена: в legal-страницах `support@promova.com` отдаётся как
+   `[email protected]` и раскрывается скриптом Cloudflare. Движок теперь отдаёт
+   те же документы со своего хоста, и без этой настройки адрес уедет в открытом
+   виде — тот же текст, другая экспозиция для спам-харвестеров. Проверено
+   2026-09-08: единственное расхождение текста между двумя хостами — ровно эта
+   обфускация, содержимое документов идентично (один и тот же Strapi-рекорд).
+7. **`cf-region` (Managed Transform «Add visitor location headers»)** — опционально.
+   Движок читает его для калифорнийского слага Terms. Сегодня он ничего не
+   меняет: прод резолвит US-правило раньше калифорнийского, и движок повторяет
+   этот порядок осознанно. Нужен, только если правило будут править на обеих
+   сторонах.
