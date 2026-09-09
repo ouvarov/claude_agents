@@ -24,7 +24,7 @@
 | приоритет | всего | закрыто | осталось |
 |---|---|---|---|
 | P0 — блокируют пилот | 20 | **20** | 0 |
-| P1 — паритет метрик и контрактов | 33 | **1** | 32 |
+| P1 — паритет метрик и контрактов | 33 | **6** | 27 |
 | P2 — полнота DSL, воронки, авторинг | 24 | 0 | 24 |
 | P3 — тесты и гигиена | 10 | 0 | 10 |
 
@@ -116,11 +116,11 @@ PII, потеря данных). **P1** — паритет метрик и ко�
 
 | # | гэп | область | размер |
 |---|---|---|---|
-| P1-1 | `selected_options` = answerKeys вместо текстов; `selected_answer_id` отсутствует | O/E | S |
-| P1-2 | Синтетический `user_language_level` не отправляется | O | S |
-| P1-3 | Нет `cleanSelectedAnswers` (фильтр пустых, стрип HTML) | O | S |
-| P1-4 | localStorage-хэндофф не несёт `quiz_id`/`flow_id`/`entry_point` | E | S |
-| P1-5 | `withUserId` стирает `user_type: 'registered'` | E | S |
+| ~~P1-1~~ | ~~`selected_options` = answerKeys вместо текстов; `selected_answer_id` отсутствует~~ — **СДЕЛАНО 2026-09-09** | O/E | S |
+| ~~P1-2~~ | ~~Синтетический `user_language_level` не отправляется~~ — **СДЕЛАНО 2026-09-09** | O | S |
+| ~~P1-3~~ | ~~Нет `cleanSelectedAnswers` (фильтр пустых, стрип HTML)~~ — **СДЕЛАНО 2026-09-09** | O | S |
+| ~~P1-4~~ | ~~localStorage-хэндофф не несёт `quiz_id`/`flow_id`/`entry_point`~~ — **СДЕЛАНО 2026-09-09** | E | S |
+| ~~P1-5~~ | ~~`withUserId` стирает `user_type: 'registered'`~~ — **СДЕЛАНО 2026-09-09** | E | S |
 | P1-6 | Backend CAPI-feed: `PATCH /v1/users/properties {fbc,fbp}`, `POST /v1/billing/funnel/users/payload`, `sendMarketingEvents` не вызывается | A | M |
 | P1-7 | Meta `em` advanced matching никогда не отправляется (`ctx.email` не заполняется) | A | S |
 | P1-8 | Meta Purchase без `content_ids`/`content_type`/`order_id` | A | S |
@@ -742,6 +742,44 @@ Terms» внутри FTC-дисклеймера). Ни одного роута `
 
 **P1-5. `user_type` для залогиненного.** `src/routes/quiz.ts:415-425`: `userType: ctx.userType` вместо литерала.
 
+**P1-1…P1-5. Контракт ответов и хэндофф. — СДЕЛАНО 2026-09-09.**
+Всё сверено по компонентам экранов прода, а не по догадке.
+
+- **Лейбл и ключ — это два разных поля.** Прод шлёт `selected_options` = то,
+  что визитёр ПРОЧИТАЛ, и `selected_answer_id` = стабильный ключ
+  (`ChoiceScreen.tsx:42-50` → `formatAnswersForBE.ts:13-25`). Движок посылал
+  ключи в оба, то есть в CRM лежало `["goal_career"]` там, где у платформы
+  `["Career growth"]` — один и тот же вопрос, два несравнимых набора. Правило
+  у прода **по архетипу**, и портировано по архетипу: `choice` и
+  `goal-selector` → `title` опции, старт-скрин → `title` тайла, `agree-scale`
+  → ключ в оба поля (там эмодзи, лейбла нет), `name-input` → строка
+  `'provided'` и имя в id.
+- **Ответы на гейты лоадера не уходили вообще.** Они лежат в `state.answers`
+  под `gate.questionId`, который намеренно не является id экрана, а оба
+  билдера пропускали всё, чего нет в `quiz.screens`. Два живых вопроса
+  general-english — `loader_reminders`, `loader_short_lessons` — доезжали до
+  CRM на платформе и никуда у нас.
+- **`user_language_level`** пишется всегда (`useSaveTestResult.ts:76-83`);
+  назначение курса и CRM-сегменты читают только этот ключ. Берётся из ответа
+  на `ft8_lvl`, при отсутствии — `A1`, дефолт прода.
+- **`cleanSelectedAnswers`**: пустой выбор не отправляется вовсе (пустой
+  массив снаружи не отличить от «вопрос не задавали»), из тайтлов снимается
+  разметка.
+- **`quiz_id`/`flow_id`/`entry_point`** в объекте хэндоффа: `saveTestResults.ts:21-24`
+  читает их с того же объекта, что и ответы, — без них платформа
+  перезаписывала результат под аккаунт с тремя undefined, то есть без воронки.
+- **`user_type`**: `withUserId` больше не перебивает его на `'unregistered'`.
+  Поле отвечает на «есть ли у визитёра аккаунт платформы», это решает
+  `requestCtx` по её сессионной куке; Firebase-uid говорит лишь о том, что
+  воронка создала анонимную личность, а её получают все. Из-за перебивки
+  залогиненный визитёр после email-шага числился новым во всех событиях.
+
+Приёмка: 475 кейсов, 14/14 сьютов. Живой payload проверен целиком — коммит
+`96fcfe4`.
+
+Q8 из раздела 4 снимается: прод отвечает на него однозначно — тексты в
+`selected_options`, ключи в `selected_answer_id`.
+
 **P1-6. Backend CAPI-feed.** `src/routes/sales.ts` на GET paywall: `PATCH /v1/users/properties {fbc, fbp}` и `POST /v1/billing/funnel/users/payload {facebook_pixel_id, page_view:{url}}` (обёртки в `src/platform.ts`); `sendMarketingEvents` вызывать там же, где прод зовёт `logFacebookEvent` (email completed, purchase, upsell). Приёмка: моки вызваны с полями прода.
 
 **P1-7. Meta `em`.** `src/http.ts:188-205` / `withUserId`: заполнять `ctx.email` из `idb`; `PixelConfig.email` на всех трёх поверхностях; в `third-party.ts` — `fbq('init', id, {em})` + re-init после email-экрана как `CommonScripts.tsx:117-133`.
@@ -874,7 +912,7 @@ Terms» внутри FTC-дисклеймера). Ни одного роута `
 | ~~Q5~~ | ~~Реальный набор продуктов `general-english-downsell` и `-upsell*`~~ — **СНЯТ 2026-09-08**: продукты даёт автор воронки, движок проверяет их в проде. Правила `gringotts.promova.work/api/pricing-rule/<slug>/commerce` открыты без токена, каталог читается через MCP прода. | — | — |
 | Q6 | Своя формулировка ROSCA под планами допустима, или только ревьюленная (24 ч + ссылка)? | legal | P0-13 |
 | Q7 | Лимит `check_email_provider` по IP: весь трафик движка идёт с адресов пода | бэкенд auth | P0-16 |
-| Q8 | `selected_options`: кто читает downstream — тексты или ключи? `selected_answer_id` нужен? | бэкенд / CRM / аналитика | P1-1 |
+| ~~Q8~~ | ~~`selected_options`: тексты или ключи?~~ — **СНЯТ 2026-09-09**: прод шлёт тексты в `selected_options` и ключи в `selected_answer_id`, портировано дословно | — | — |
 | Q9 | Таймер: WARN или FAIL (политика «таймеров не будет»)? | продукт | P1-31 |
 | Q10 | Локали пилота: `uk` под что? Нужны ли прод `es/pt/de/fr/it` в MVP? | маркетинг | P2-1 |
 | Q11 | english-hub `landing` — переносить как экран (30 полей) или как sales-страницу с email-шагом? | продукт | P2-2 |
