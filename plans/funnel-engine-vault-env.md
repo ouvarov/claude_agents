@@ -3,9 +3,34 @@
 Инфра поднята 2026-09-07 (DevOps, DM): `gimli.promova.com` — dev-хост,
 `gimli_dev/kv/env` и `gimli_prod/kv/env` созданы пустыми.
 
-Движок читает 25 переменных. Источник прод-значений — Vault монорепы,
+Движок читает 26 переменных. Источник прод-значений — Vault монорепы,
 mount `monorepo-frontend-prod`, path `student` (это тот деплой, что обслуживает
 `/kilo/general-english` на promova.com; см. `.github/deployment-config.yaml:21`).
+
+**Решение Алекса 2026-09-09: у каждого сабдомена будет свой Vault-path.** Это
+модель chameleon (один деплой на домен, свой набор env), и она снимает
+необходимость искать пер-доменные данные в Strapi: пиксели, домен и ключи
+несёт окружение. Поэтому список ниже делится на две части — что **одинаково**
+во всех путях и что **отличается** от домена к домену.
+
+## Что отличается на каждый домен
+
+| ключ | почему на домен |
+|---|---|
+| `DOMAIN_NAME` | **новая, 2026-09-09.** Домен, от имени которого продаёт этот деплой. Решает три вещи, которые обязаны совпадать: какие легал-документы видит визитёр, какую компанию называет футер и строка под формой карты, какой `domain` уходит в аналитику. Не задана — подставляется хост запроса (`X-Forwarded-Host`, затем `Host`); в проде задавать обязательно, иначе юрлицо выбирает ingress. Что в силе, видно в строке `startup`. |
+| `FB_PIXEL_ID`, `TIKTOK_PIXEL_ID` | конверсии домена должны идти в его рекламный аккаунт, а не в общий |
+| `STATE_HMAC_KEY`, `DIAG_TOKEN` | их и так не стоит делить между деплоями |
+| `LIVE_MODE`, `SEND_EVENTS`, `LOAD_PIXELS`, `ENVIRONMENT` | отличаются dev/prod, а не доменом — но лежат в том же пути |
+
+Остальное — одно и то же значение, скопированное в каждый путь: `API_HOST`,
+`API_PAYMENTS_HOST`, `API_MARKETING_HOST`, `MARKETING_STRAPI_URL`,
+`GROWTHBOOK_*`, `AMPLITUDE_API_KEY`, `COOKIEYES_ID`, `MARKETING_SDK_TOKEN`,
+`FIREBASE_WEB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `GTM_ID`, `WEB_ORIGIN`.
+
+`WEB_ORIGIN` остаётся `https://promova.com` на всех доменах: это origin
+платформы для hand-off после оплаты, а не собственный домен воронки. Легалку он
+больше не обслуживает — с 9 сентября движок читает и страницы, и юридические
+строки из Strapi сам, с `DOMAIN_NAME`.
 
 ## Карта: ключ движка ← источник
 
@@ -27,7 +52,8 @@ mount `monorepo-frontend-prod`, path `student` (это тот деплой, чт
 | `FB_PIXEL_ID` | Vault `student` → `NEXT_PUBLIC_FB_PIXEL_ID` | нет |
 | `TIKTOK_PIXEL_ID` | Vault `student` → `NEXT_PUBLIC_TIKTOK_PIXEL_ID` | нет |
 | `GTM_ID` | `GTM-WKZFDV3` (`packages/config/constants/common.ts:44`) | нет |
-| `WEB_ORIGIN` | `https://promova.com` | нет |
+| `WEB_ORIGIN` | `https://promova.com` — origin платформы, одинаков на всех доменах | нет |
+| `DOMAIN_NAME` | домен этого деплоя (`gimli.promova.com`, дальше — по домену на путь) | нет |
 | `ENVIRONMENT` | `production` / `dev` | нет |
 | `PORT` | `8080` | нет |
 | `HOSTNAME` | ставит k8s (имя пода), руками не заполнять | нет |
@@ -54,6 +80,7 @@ openssl rand -hex 24      # DIAG_TOKEN
 ENVIRONMENT=production
 PORT=8080
 WEB_ORIGIN=https://promova.com
+DOMAIN_NAME=gimli.promova.com
 GTM_ID=GTM-WKZFDV3
 LIVE_MODE=true
 SEND_EVENTS=true
@@ -97,6 +124,26 @@ LOAD_PIXELS=false
 | Solidgate | реальные списания | `sandbox: true` (`routes/sales.ts:371`, `post-purchase.ts:449`) |
 | Amplitude / CRM | уходят наружу | только в лог (`analytics/emit.ts:105`) |
 | пиксели | грузятся | не грузятся, если `LOAD_PIXELS` не `true` |
+
+## Добавление нового сабдомена
+
+1. DNS + ingress на движок, зона проксирована Cloudflare (иначе нет
+   `cf-ipcountry`, см. пункт 1 ниже).
+2. Свой Vault-path: скопировать общий блок, задать `DOMAIN_NAME`,
+   `FB_PIXEL_ID`, `TIKTOK_PIXEL_ID`, сгенерировать свои `STATE_HMAC_KEY` и
+   `DIAG_TOKEN`.
+3. Если домен продаёт от **другого юрлица** — рекорд `fb-multi-domain` в Strapi
+   с `domainName` = точный хостнейм: три связи на legal-страницы
+   (`termsOfUsePage`, `privacyPolicyPage`, `subscriptionTermsPage`) и связь
+   `legalRule` для строки продавца и строки под формой карты. Кода не трогаем.
+4. Блок в `SLUGS_BY_HOST_AND_REGION` (`src/legal.ts`) — только если домену
+   нужны **гео-специфичные** документы (как у english-improve и spanish-boost).
+   Субдомену promova.com блок не нужен и заводить его нельзя: он наследует
+   юрлицо promova.com, и это прод-решение, записанное на
+   `FunnelBuilderDomains.LEARN_PROMOVA`.
+
+Без пунктов 3 и 4 новый домен отдаёт документы promova.com и её же строку
+продавца — то есть безопасный дефолт, а не пустоту.
 
 ## Остаётся за DevOps (не в env)
 
