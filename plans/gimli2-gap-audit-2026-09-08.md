@@ -24,7 +24,7 @@
 | приоритет | всего | закрыто | осталось |
 |---|---|---|---|
 | P0 — блокируют пилот | 20 | **20** | 0 |
-| P1 — паритет метрик и контрактов | 33 | **6** | 27 |
+| P1 — паритет метрик и контрактов | 33 | **8** | 25 |
 | P2 — полнота DSL, воронки, авторинг | 24 | 0 | 24 |
 | P3 — тесты и гигиена | 10 | 0 | 10 |
 
@@ -123,8 +123,8 @@ PII, потеря данных). **P1** — паритет метрик и ко�
 | ~~P1-5~~ | ~~`withUserId` стирает `user_type: 'registered'`~~ — **СДЕЛАНО 2026-09-09** | E | S |
 | P1-6 | Backend CAPI-feed: `PATCH /v1/users/properties {fbc,fbp}`, `POST /v1/billing/funnel/users/payload`, `sendMarketingEvents` не вызывается | A | M |
 | P1-7 | Meta `em` advanced matching никогда не отправляется (`ctx.email` не заполняется) | A | S |
-| P1-8 | Meta Purchase без `content_ids`/`content_type`/`order_id` | A | S |
-| P1-9 | Google Ads конверсия: `dataLayer.push({event:'purchase', …})` + legacy push не портированы | A | S |
+| ~~P1-8~~ | ~~Meta Purchase без `content_ids`/`content_type`/`order_id`~~ — **СДЕЛАНО 2026-09-09** | A | S |
+| ~~P1-9~~ | ~~Google Ads конверсия не портирована~~ — **СДЕЛАНО 2026-09-09** | A | S |
 | P1-10 | `gen_joined_ab_test` не эмитится; GB-кэш без `device_id` → нет per-visitor рандомизации | A | M |
 | P1-11 | Апселл-таксономия: `upsell_purchased`, `upsell_offer_*`, `product_type`/`screen_name`/`subscription_status` на pp неверны | A/PP | M |
 | P1-12 | Пропущенные свойства: `country_funnel` на money, `revenue_started_checkout` (7 полей), `sales_payment_success.total`, `funnels_email_completed.screen_name`, visibility-пропсы старта | A | M |
@@ -787,6 +787,34 @@ Q8 из раздела 4 снимается: прод отвечает на не
 **P1-8. Meta Purchase payload.** `src/analytics/ltv.ts:161-165` + `money.ts:333-338`: добавить `content_ids:[productId]`, `content_type: paymentMode`, `order_id`.
 
 **P1-9. Google Ads конверсия.** `src/analytics/money.ts` на `PURCHASED`: два `dataLayer.push` по `utils/analytics.ts:578-631` (с USD-флипом и `user_email`).
+
+**P1-8, P1-9. Что платформы узнают о покупке. — СДЕЛАНО 2026-09-09.**
+
+- **Meta Purchase** нёс только `value` и `currency`. Прод шлёт ещё три
+  (`buildFacebookPurchaseData.ts:60-68`): `content_ids`, `content_type`,
+  `order_id`. Без `content_ids` каталожная отчётность Meta и все
+  продуктовые аудитории не видят ничего; без `order_id` браузерное событие и
+  серверная CAPI-копия перестают склеиваться в одну конверсию — а ровно для
+  этого оба его и несут. `content_type` = `paymentMode` плана, с продовым
+  фолбэком `'product'`: Meta отклоняет событие, где есть `content_ids` и нет
+  `content_type`.
+- **Google Ads не получал конверсию вообще.** Контейнер конвертит на пуше
+  `event: 'purchase'` (`analytics.ts:577-609`), а движковый
+  `purchase_ecommerce` — это другой пуш, продовый пейволльный, на который ни
+  один тег Google Ads не подписан. Добавлен со своим бэкендовым LTV-запросом
+  (прод спрашивает по каждому destination отдельно; переиспользовать ответ
+  TikTok значило бы подставить модель одной платформы в конверсию другой).
+  `ltv` и `currency` двигаются вместе: бэкендовый прогноз — USD, локальная
+  формула остаётся в валюте списания. `transaction_id` — id **заказа**: прод
+  когда-то ключевал его на product id и склеивал все заказы одного продукта в
+  одну конверсию, в коде об этом теперь висит комментарий.
+- Legacy-пуш Enhanced Ecommerce уходит отдельным событием, потому что тег,
+  читающий `ecommerce.purchase.actionField`, первый объект не видит.
+
+`user_email` для enhanced conversions проброшен, но пока не заполняется —
+для этого нужен email в money-контексте, это P1-7.
+
+Приёмка: 488 кейсов, 14/14 сьютов; коммит `6f46b52`.
 
 **P1-10. `gen_joined_ab_test`.** `src/growthbook.ts`: из ответа remote-eval брать `experiments`/`inExperiment` и эмитить событие (once per sid, хранить в `state`); кэш ключевать с `device_id` для фич с процентным роллаутом (или отключить кэш для них). Приёмка: флаг с 50/50 на dev даёт разные варианты разным device_id и событие в логе.
 
