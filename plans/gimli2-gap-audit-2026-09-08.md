@@ -512,6 +512,74 @@ allowlist. Живьём: с ключом на dev-инстансе `/sierra/gene
 - **Текстовая сверка с платформой**: `/terms/refund` и `/terms/faq-resident` совпадают на 100 % чанков; `/terms/subscription-terms` — 44 из 49, и все пять расхождений содержат `support@promova.com`. Причина найдена: на `promova.com` включена Cloudflare Email Address Obfuscation (`[email protected]`). Содержимое документов идентично, потому что это один и тот же Strapi-рекорд. Пункт 6 для DevOps, который отсюда вырос, **снят 2026-09-09**: настройка зонная, движок живёт на субдомене `promova.com`, наследование проверено на `learn.promova.com`. Там же — что обфускация везде половинчатая (сырой адрес в RSC-payload того же ответа).
 - `grep` по `src/` и `funnels/`: ни одного `promova.com/terms`. В HTML paywall'а, старт-скрина и чекаута legal-href'ы относительные, под `uk` — с префиксом.
 
+**P0-20 доработка: документ выбирается по ХОСТУ, а не только по стране. —
+СДЕЛАНО 2026-09-09.**
+
+Первая реализация резолвила слаг по правилам **платформы**
+(`apps/student/utils/getTermsAndConditionsSlugByGeo.ts`). Это была ошибка:
+движок — вороночный хост, а все вороночные хосты в проде резолвят через
+chameleon (`apps/funnels/chameleon/utils/dataFetching/termsPage/
+getChameleonTermsSlug.ts` + `fetchTerms.ts`). Правила расходятся на четырёх
+гео, то есть движок отдал бы украинскому визитёру другой документ, чем
+`learn.promova.com` — ровно та поломка, ради которой роут и делался. Проверено
+живьём: с UA-адреса `learn.promova.com/terms/terms-and-conditions` возвращает
+кипрский документ («Promova Limited … Limassol»), не UA-вариант.
+
+Цепочка теперь такая, в этом порядке:
+
+1. слаг по паре **хост × регион** (`SLUGS_BY_HOST_AND_REGION` в `src/legal.ts`);
+   если таблица ответила — используется он и больше ничего не спрашивается;
+2. **персональный рекорд хоста в CMS** —
+   `GET /api/fb-domain-data-terms?filters[domainName]=<host>&pageType=<…>`;
+   это и есть рычаг «новый субдомен = задача контенту, не релиз»;
+3. документ promova.com.
+
+Регионы: `US`, `UAE`, `UAE_UK_EU` (Эмираты + EU-27 + Великобритания делят один
+документ), `OTHER`. UA и IN не входят ни в один — у платформы для них есть свои
+документы, у вороночных хостов нет.
+
+Хост берётся из запроса (`X-Forwarded-Host`, затем `Host`), а не из env, потому
+что движок — один образ на все хосты. Это отличие от chameleon по необходимости:
+у него `NEXT_PUBLIC_CURRENT_DOMAIN` и один домен на деплой. Пункт 3 списка
+DevOps (forwarded-заголовки) из-за этого перешёл из «обязательное» в
+«обязательное и с последствием»: по этому заголовку выбирается, чьи легалы
+видит визитёр.
+
+`DEFAULT`-колонка без блока под субдомены promova.com — это тоже прод-решение,
+а не пропуск: комментарий на `FunnelBuilderDomains.LEARN_PROMOVA` говорит, что
+субдомен наследует юрлицо promova.com и намеренно не получает своего блока,
+иначе «молча отвяжется от страниц, которые подписал Legal».
+
+Три следствия, согласованы с Алексом 2026-09-09 перед реализацией: визитёр из
+EU/UK получает UAE-документ (FT SICH FZCO, Дубай) вместо кипрского; из US —
+`US_ea` вместо обычного US; UA и IN теряют свои документы. Каждое — это то,
+что вороночные хосты делают сегодня.
+
+Приёмка (прогнано): `pnpm typecheck`, `pnpm validate` 0 failures,
+`pnpm test` 14/14 сьютов (440 кейсов; `tests/legal.test.ts` — 105),
+`pnpm build`. Живьём против настоящего Strapi, 13 пар хост/гео:
+
+| хост | гео | документ |
+|---|---|---|
+| `gimli.promova.com` | US | TERMS AND CONDITIONS OF USE **US_ea** |
+| `gimli.promova.com` | PL, GB | TERMS … **UAE** (FT SICH FZCO, Dubai) |
+| `gimli.promova.com` | UA, IN | TERMS … (**Cyprus**, Promova Limited) |
+| `gimli.promova.com` | US | PRIVACY POLICY **US_ea** |
+| `gimli.promova.com` | любое | SUBSCRIPTION TERMS (один рекорд на все гео) |
+| `promova-ai-academy.com` | UA | SUBSCRIPTION TERMS_**PALM** — через шаг 2, в логе `{"kind":"legal_host_override"}` |
+| `promova-ai-academy.com` | US | TERMS … _PALM_US (шаг 1 обгоняет override) |
+| `english-improve.com` | US / AE | TERMS … US_**ei** / UAE_**ei** |
+
+Персональных рекордов в CMS сегодня ровно один — у `promova-ai-academy.com`.
+У `learn.promova.com`, `spanish-boost.com`, `english-improve.com`,
+`promova-english-academy.com`, `promova.com` и `gimli.promova.com` — 404, то
+есть общий документ. Два ограничения override'а, оба прод: он **только
+английский** (эндпоинт не populate'ит локализации) и его **обгоняет** слаг из
+таблицы хост × регион.
+
+Побочно: `requestRegion`/`cf-region` удалён — читался только под калифорнийский
+слаг, которого в вороночных правилах нет. Пункт 8 списка DevOps снят.
+
 **Переводы legal — проверено на живом Strapi 2026-09-08.** Локализации берутся
 из тех же записей, что читает платформа, поэтому язык документа совпадает с
 продом по построению. Что реально лежит в CMS:
@@ -574,11 +642,13 @@ Terms» внутри FTC-дисклеймера). Ни одного роута `
    Это осознанное исключение из правила «не ходить в Strapi напрямую» старого
    плана §6: у платформы нет прокси для `/api/pages`, а заводить его в монорепе
    ради движка — лишняя зависимость. Snippet-эндпоинты остаются через прокси.
-2. **Гео-слаг.** `src/legal.ts`: порт `getTermsAndConditionsSlugByGeo` и
-   `getPrivacyPolicySlugByGeo` (страна из `cf-ipcountry`, регион — если
-   Cloudflare отдаёт `cf-region-code`, иначе California не отличить от US:
-   зафиксировать как известное ограничение, платформа тоже берёт регион из
-   гео-провайдера). Списки стран — из `packages/config/types/countries`.
+2. **Гео-слаг.** ~~Порт `getTermsAndConditionsSlugByGeo` и
+   `getPrivacyPolicySlugByGeo`~~ — **это была ошибка, исправлено 2026-09-09.**
+   Оба файла принадлежат платформе, а движок — вороночный хост, и вороночные
+   хосты резолвят документы по chameleon (`getChameleonTermsSlug.ts` +
+   `fetchTerms.ts`): хост × регион → персональный CMS-рекорд хоста → документ
+   promova.com. Правила расходятся на четырёх гео. Подробности и приёмка —
+   в разделе про хосты ниже.
 3. **Роуты.** `src/routes/legal.ts`: `GET /:locale?/terms/:page` для шести
    путей. Рендер в общем `layout.ts` с темой, `<h1>` из `title`, `content`
    как HTML. Прод вставляет `content` через `dangerouslySetInnerHTML` без
