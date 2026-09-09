@@ -109,13 +109,23 @@ LOAD_PIXELS=false
 4. `HOSTNAME` из downward API.
 5. Пробы: `GET /healthz` (liveness), `GET /ready` (readiness, 503 до загрузки
    реестра воронок).
-6. **Email Address Obfuscation на зоне `gimli.promova.com`.** На `promova.com`
-   она включена: в legal-страницах `support@promova.com` отдаётся как
-   `[email protected]` и раскрывается скриптом Cloudflare. Движок теперь отдаёт
-   те же документы со своего хоста, и без этой настройки адрес уедет в открытом
-   виде — тот же текст, другая экспозиция для спам-харвестеров. Проверено
-   2026-09-08: единственное расхождение текста между двумя хостами — ровно эта
-   обфускация, содержимое документов идентично (один и тот же Strapi-рекорд).
+6. ~~**Email Address Obfuscation на зоне `gimli.promova.com`.**~~ **СНЯТО
+   2026-09-09 — просить нечего.** Настройка зонная, а `gimli.promova.com` живёт
+   в зоне `promova.com`, где она уже включена. Проверено на соседе по зоне:
+   `learn.promova.com/terms/subscription-terms` (тот же chameleon, тот же
+   Strapi-рекорд) отдаёт `data-cfemail` — значит субдомены наследуют. Сам
+   `gimli.promova.com` уже за Cloudflare (`server: cloudflare`, `cf-ray`),
+   сейчас отвечает 403.
+   Попутно выяснилось, что защита **всюду половинчатая**, и это стоит знать,
+   прежде чем ссылаться на неё как на меру: в том же ответе, где тело отдано
+   как `[email protected]`, адрес лежит открытым текстом в RSC-payload
+   (`self.__next_f`), потому что переписыватель Cloudflare трогает HTML и
+   `mailto:`, но не содержимое скриптов. Проверено 2026-09-09 на пяти хостах:
+   `promova.com`, `learn.promova.com`, `spanish-boost.com`,
+   `english-improve.com`, `promova-ai-academy.com`,
+   `promova-english-academy.com` — на каждом и `data-cfemail`, и сырой адрес.
+   У движка RSC-payload нет вовсе, так что на его страницах обфускация
+   сработает целиком: он окажется в этом месте чище прода, а не грязнее.
 7. **`GIT_HASH` в чарт** — иначе `/healthz` отдаёт `version: null`, и «роллаут
    закончился» не отличить от «роллаут закончился, а старый образ ещё отвечает».
 8. **`cf-region` (Managed Transform «Add visitor location headers»)** — опционально.

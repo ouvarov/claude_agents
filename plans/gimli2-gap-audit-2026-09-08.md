@@ -24,7 +24,7 @@
 | приоритет | всего | закрыто | осталось |
 |---|---|---|---|
 | P0 — блокируют пилот | 20 | **20** | 0 |
-| P1 — паритет метрик и контрактов | 33 | 0 | 33 |
+| P1 — паритет метрик и контрактов | 33 | **1** | 32 |
 | P2 — полнота DSL, воронки, авторинг | 24 | 0 | 24 |
 | P3 — тесты и гигиена | 10 | 0 | 10 |
 
@@ -144,7 +144,7 @@ PII, потеря данных). **P1** — паритет метрик и ко�
 | P1-26 | `state.done` не читается; `ds` ставится на skip, не на view; нет `hx-push-url` | PP | S |
 | P1-27 | Квиз-результат пишется один раз без retry | E | S |
 | P1-28 | `CLAUDE.md` и SKILL с автоподгрузкой отсутствуют | AU | S |
-| P1-29 | `pnpm validate` не входит в `pnpm build` | AU | S |
+| ~~P1-29~~ | ~~`pnpm validate` не входит в `pnpm build`~~ — **СДЕЛАНО 2026-09-09** попутно с P0-19 | AU | S |
 | P1-30 | Product id не проверяются по живому каталогу; путь через Walhalla MCP не задокументирован | AU | M |
 | P1-31 | Таймер — только WARN в валидаторе | AU | S |
 | P1-32 | Логи движка не подтверждены в Loki; нет Faro/error reporting | A/AU | M (DevOps) |
@@ -509,7 +509,7 @@ allowlist. Живьём: с ключом на dev-инстансе `/sierra/gene
 - `pnpm test:e2e` против живого сервера: все legal-кейсы зелёные. Один провал не связан с задачей — «email step fails closed without an auth key» падает локально потому, что в локальном `.env` ключ Firebase есть, то есть предпосылка теста не выполняется (в CI ключа нет).
 - Живые запросы: `/terms/cookie-policy` 200, `/terms/pricing` 404, `/terms/subscription-terms` 503 без env, `/terms` → 302, `/uk/terms/cookie-policy` 200.
 - Все одиннадцать слагов, которые может выдать роутер, резолвятся против живого Strapi (`gringotts.promova.work`): `terms-of-use`, `-us`, `-ua`, `-ind`, `-1`, `privacy-policy`, `-us`, `subscription-terms`, `refund-policy`, `faq-resident-eu` + украинская локализация.
-- **Текстовая сверка с платформой**: `/terms/refund` и `/terms/faq-resident` совпадают на 100 % чанков; `/terms/subscription-terms` — 44 из 49, и все пять расхождений содержат `support@promova.com`. Причина найдена: на `promova.com` включена Cloudflare Email Address Obfuscation (`[email protected]`). Содержимое документов идентично, потому что это один и тот же Strapi-рекорд. Отсюда пункт 6 для DevOps в `funnel-engine-vault-env.md`.
+- **Текстовая сверка с платформой**: `/terms/refund` и `/terms/faq-resident` совпадают на 100 % чанков; `/terms/subscription-terms` — 44 из 49, и все пять расхождений содержат `support@promova.com`. Причина найдена: на `promova.com` включена Cloudflare Email Address Obfuscation (`[email protected]`). Содержимое документов идентично, потому что это один и тот же Strapi-рекорд. Пункт 6 для DevOps, который отсюда вырос, **снят 2026-09-09**: настройка зонная, движок живёт на субдомене `promova.com`, наследование проверено на `learn.promova.com`. Там же — что обфускация везде половинчатая (сырой адрес в RSC-payload того же ответа).
 - `grep` по `src/` и `funnels/`: ни одного `promova.com/terms`. В HTML paywall'а, старт-скрина и чекаута legal-href'ы относительные, под `uk` — с префиксом.
 
 **Переводы legal — проверено на живом Strapi 2026-09-08.** Локализации берутся
