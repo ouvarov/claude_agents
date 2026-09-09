@@ -3,7 +3,7 @@
 Инфра поднята 2026-09-07 (DevOps, DM): `gimli.promova.com` — dev-хост,
 `gimli_dev/kv/env` и `gimli_prod/kv/env` созданы пустыми.
 
-Движок читает 23 переменные. Источник прод-значений — Vault монорепы,
+Движок читает 25 переменных. Источник прод-значений — Vault монорепы,
 mount `monorepo-frontend-prod`, path `student` (это тот деплой, что обслуживает
 `/kilo/general-english` на promova.com; см. `.github/deployment-config.yaml:21`).
 
@@ -21,6 +21,7 @@ mount `monorepo-frontend-prod`, path `student` (это тот деплой, чт
 | `API_PAYMENTS_HOST` | Vault `student` → `NEXT_PUBLIC_API_PAYMENTS_HOST` | нет |
 | `API_MARKETING_HOST` | Vault `student` → `NEXT_PUBLIC_API_MARKETING` | нет |
 | `MARKETING_STRAPI_URL` | Vault `student` → `NEXT_PUBLIC_MARKETING_STRAPI_URL` (прод-значение `https://gringotts.promova.work`) | нет |
+| `FIREBASE_SERVICE_ACCOUNT` | **новый секрет.** JSON сервис-аккаунта Firebase того же проекта, что `FIREBASE_WEB_API_KEY`. Нужен, чтобы после покупки визитёр попадал на платформу уже залогиненным. Пусто = фолбэк на `link_for_auth` (ссылка живёт ~минуту, минтится по клику). Решено 2026-09-08: положить в Vault, до тех пор пустая переменная в локальном `.env` | да |
 | `AMPLITUDE_API_KEY` | Vault `student` → `NEXT_PUBLIC_AMPLITUDE_API_KEY` | нет* |
 | `COOKIEYES_ID` | Vault `student` → `NEXT_PUBLIC_COOKIEYES_ID` | нет |
 | `FB_PIXEL_ID` | Vault `student` → `NEXT_PUBLIC_FB_PIXEL_ID` | нет |
@@ -30,6 +31,7 @@ mount `monorepo-frontend-prod`, path `student` (это тот деплой, чт
 | `ENVIRONMENT` | `production` / `dev` | нет |
 | `PORT` | `8080` | нет |
 | `HOSTNAME` | ставит k8s (имя пода), руками не заполнять | нет |
+| `GIT_HASH` | коммит образа; отдаётся в `/healthz` как `version`. Передавать **через чарт как обычную env**, не как build-arg: у движка нулевая build-time конфигурация, и один образ на все окружения — его осознанное свойство | нет |
 | `LIVE_MODE` | см. ниже | нет |
 | `SEND_EVENTS` | см. ниже | нет |
 | `LOAD_PIXELS` | см. ниже | нет |
@@ -68,6 +70,7 @@ FB_PIXEL_ID=<student: NEXT_PUBLIC_FB_PIXEL_ID>
 TIKTOK_PIXEL_ID=<student: NEXT_PUBLIC_TIKTOK_PIXEL_ID>
 MARKETING_SDK_TOKEN=<student: NEXT_PUBLIC_MARKETING_SDK_TOKEN>
 FIREBASE_WEB_API_KEY=<packages/utils/firebase.ts:7>
+FIREBASE_SERVICE_ACCOUNT=<JSON сервис-аккаунта того же Firebase-проекта>
 STATE_HMAC_KEY=<openssl rand -base64 32>
 DIAG_TOKEN=<openssl rand -hex 24>
 ```
@@ -113,8 +116,16 @@ LOAD_PIXELS=false
    виде — тот же текст, другая экспозиция для спам-харвестеров. Проверено
    2026-09-08: единственное расхождение текста между двумя хостами — ровно эта
    обфускация, содержимое документов идентично (один и тот же Strapi-рекорд).
-7. **`cf-region` (Managed Transform «Add visitor location headers»)** — опционально.
+7. **`GIT_HASH` в чарт** — иначе `/healthz` отдаёт `version: null`, и «роллаут
+   закончился» не отличить от «роллаут закончился, а старый образ ещё отвечает».
+8. **`cf-region` (Managed Transform «Add visitor location headers»)** — опционально.
    Движок читает его для калифорнийского слага Terms. Сегодня он ничего не
    меняет: прод резолвит US-правило раньше калифорнийского, и движок повторяет
    этот порядок осознанно. Нужен, только если правило будут править на обеих
    сторонах.
+
+---
+
+Полная сверка с прод-воронками (что chameleon получает от платформы бесплатно,
+что является настройкой зоны, что кодом) — в `funnel-engine-devops-parity.md`.
+Там же три вопроса про логи, на которые репозиторий монорепы ответить не может.
