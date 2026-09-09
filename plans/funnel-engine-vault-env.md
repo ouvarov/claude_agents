@@ -21,7 +21,7 @@ mount `monorepo-frontend-prod`, path `student` (это тот деплой, чт
 | `API_PAYMENTS_HOST` | Vault `student` → `NEXT_PUBLIC_API_PAYMENTS_HOST` | нет |
 | `API_MARKETING_HOST` | Vault `student` → `NEXT_PUBLIC_API_MARKETING` | нет |
 | `MARKETING_STRAPI_URL` | Vault `student` → `NEXT_PUBLIC_MARKETING_STRAPI_URL` (прод-значение `https://gringotts.promova.work`) | нет |
-| `FIREBASE_SERVICE_ACCOUNT` | **новый секрет.** JSON сервис-аккаунта Firebase того же проекта, что `FIREBASE_WEB_API_KEY`. Нужен, чтобы после покупки визитёр попадал на платформу уже залогиненным. Пусто = фолбэк на `link_for_auth` (ссылка живёт ~минуту, минтится по клику). Решено 2026-09-08: положить в Vault, до тех пор пустая переменная в локальном `.env` | да |
+| `FIREBASE_SERVICE_ACCOUNT` | **новый секрет.** JSON сервис-аккаунта Firebase проекта `ten-words` — того же, что за `FIREBASE_WEB_API_KEY` (`packages/utils/firebase.ts:10`); токен, подписанный ключом другого проекта, Firebase отклонит, и визитёр увидит форму логина без объяснений. Нужен, чтобы после покупки визитёр попадал на платформу уже залогиненным. Код с 2026-09-09 читает его в `src/custom-token.ts`; пусто = фолбэк на `link_for_auth` (ссылка живёт ~минуту, минтится по клику), сломанный JSON = одна строка в лог и тот же фолбэк. Принимаются оба вида PEM: с экранированными `\n` и с реальными переводами строк | да |
 | `AMPLITUDE_API_KEY` | Vault `student` → `NEXT_PUBLIC_AMPLITUDE_API_KEY` | нет* |
 | `COOKIEYES_ID` | Vault `student` → `NEXT_PUBLIC_COOKIEYES_ID` | нет |
 | `FB_PIXEL_ID` | Vault `student` → `NEXT_PUBLIC_FB_PIXEL_ID` | нет |
@@ -70,7 +70,7 @@ FB_PIXEL_ID=<student: NEXT_PUBLIC_FB_PIXEL_ID>
 TIKTOK_PIXEL_ID=<student: NEXT_PUBLIC_TIKTOK_PIXEL_ID>
 MARKETING_SDK_TOKEN=<student: NEXT_PUBLIC_MARKETING_SDK_TOKEN>
 FIREBASE_WEB_API_KEY=<packages/utils/firebase.ts:7>
-FIREBASE_SERVICE_ACCOUNT=<JSON сервис-аккаунта того же Firebase-проекта>
+FIREBASE_SERVICE_ACCOUNT=<JSON сервис-аккаунта проекта ten-words>
 STATE_HMAC_KEY=<openssl rand -base64 32>
 DIAG_TOKEN=<openssl rand -hex 24>
 ```
