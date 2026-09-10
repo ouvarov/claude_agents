@@ -3,7 +3,7 @@
 Инфра поднята 2026-09-07 (DevOps, DM): `gimli.promova.com` — dev-хост,
 `gimli_dev/kv/env` и `gimli_prod/kv/env` созданы пустыми.
 
-Движок читает 26 переменных. Источник прод-значений — Vault монорепы,
+Движок читает 27 переменных. Источник прод-значений — Vault монорепы,
 mount `monorepo-frontend-prod`, path `student` (это тот деплой, что обслуживает
 `/kilo/general-english` на promova.com; см. `.github/deployment-config.yaml:21`).
 
@@ -24,6 +24,8 @@ mount `monorepo-frontend-prod`, path `student` (это тот деплой, чт
 
 Остальное — одно и то же значение, скопированное в каждый путь: `API_HOST`,
 `API_PAYMENTS_HOST`, `API_MARKETING_HOST`, `MARKETING_STRAPI_URL`,
+`MARKETING_STRAPI_TOKEN` (когда появится — секрет, лежит во всех путях, поэтому
+ротация трогает их все сразу),
 `GROWTHBOOK_*`, `AMPLITUDE_API_KEY`, `COOKIEYES_ID`, `MARKETING_SDK_TOKEN`,
 `FIREBASE_WEB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `GTM_ID`, `WEB_ORIGIN`.
 
@@ -46,6 +48,7 @@ mount `monorepo-frontend-prod`, path `student` (это тот деплой, чт
 | `API_PAYMENTS_HOST` | Vault `student` → `NEXT_PUBLIC_API_PAYMENTS_HOST` | нет |
 | `API_MARKETING_HOST` | Vault `student` → `NEXT_PUBLIC_API_MARKETING` | нет |
 | `MARKETING_STRAPI_URL` | Vault `student` → `NEXT_PUBLIC_MARKETING_STRAPI_URL` (прод-значение `https://gringotts.promova.work`) | нет |
+| `MARKETING_STRAPI_TOKEN` | **новая, 2026-09-10, опциональная.** Read-токен того же Strapi. Сегодня не нужен: все эндпоинты, которые читает движок, отвечают без авторизации (проверено живьём на 13 парах хост × гео), и переменная пустая — заголовок не отправляется. Заведена, чтобы включение авторизации на CMS было правкой в Vault, а не деплоем. Пустая строка или пробелы считаются отсутствием: `Bearer ` без значения это 401, то есть 503 на условиях сделки вместо работающего анонимного чтения | да |
 | `FIREBASE_SERVICE_ACCOUNT` | **новый секрет.** JSON сервис-аккаунта Firebase проекта `ten-words` — того же, что за `FIREBASE_WEB_API_KEY` (`packages/utils/firebase.ts:10`); токен, подписанный ключом другого проекта, Firebase отклонит, и визитёр увидит форму логина без объяснений. Нужен, чтобы после покупки визитёр попадал на платформу уже залогиненным. Код с 2026-09-09 читает его в `src/custom-token.ts`; пусто = фолбэк на `link_for_auth` (ссылка живёт ~минуту, минтится по клику), сломанный JSON = одна строка в лог и тот же фолбэк. Принимаются оба вида PEM: с экранированными `\n` и с реальными переводами строк | да |
 | `AMPLITUDE_API_KEY` | Vault `student` → `NEXT_PUBLIC_AMPLITUDE_API_KEY` | нет* |
 | `COOKIEYES_ID` | Vault `student` → `NEXT_PUBLIC_COOKIEYES_ID` | нет |

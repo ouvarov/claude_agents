@@ -18,12 +18,6 @@ TASK_KEY="$1"
 # Environment
 export HOME="/Users/uvarovalexandr"
 export PATH="/Users/uvarovalexandr/.local/bin:$PATH"
-# Secrets live outside the repo: a token in a tracked file is rejected by
-# GitHub push protection, and rightly. Put FIGMA_ACCESS_TOKEN in
-# claude-agents/.env.local (gitignored) and this picks it up.
-FIGMA_ENV="/Users/uvarovalexandr/myProject/claude-agents/.env.local"
-[ -f "$FIGMA_ENV" ] && . "$FIGMA_ENV"
-: "${FIGMA_ACCESS_TOKEN:?FIGMA_ACCESS_TOKEN is not set — add it to $FIGMA_ENV}"
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
