@@ -16,3 +16,22 @@ logs/
 
 # Claude Code local settings
 .claude/settings.local.json
+# Internal Promova material — must never reach this repository, which is public.
+# Kept on disk, tracked nowhere. Everything below names an internal system,
+# a private repository path, a ticket, or a secret's location.
+plans/
+docs/
+scripts/
+.claude/
+_bmad/
+_bmad-output/
+content-analytics/
+experiments/
+performance-*.md
+pip-*.md
+*-1on1-*.md
+Oleksandr_Uvarov_Resume_*.md
+CLAUDE.md
+interview-prep/
+scratchpad_prlist.json
+hrinamy-suno.md
